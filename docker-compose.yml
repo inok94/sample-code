@@ -1,0 +1,69 @@
+version: '3.8'
+
+services:
+  db:
+    container_name: db-pgsql
+    image: postgres:14-alpine
+    restart: always
+    volumes:
+      - ./docker/db/pg-init-scripts:/docker-entrypoint-initdb.d
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+    ports:
+      - "15432:5432"
+  php-fpm:
+    container_name: php-fpm-sample
+    restart: always
+    build:
+      context: .
+      dockerfile: ./docker/php-fpm/Dockerfile
+    environment:
+      XDEBUG_CONFIG: >-
+        client_host=host.docker.internal
+        start_with_request=yes
+        discover_client_host=yes
+        client_port=9003
+        idekey=PHPSTORM
+        max_nesting_level=512
+        cli_color=1
+        log_level=0
+      XDEBUG_MODE: debug
+    depends_on:
+      - db
+    volumes:
+      - ./:/var/www
+
+  nginx:
+    container_name: nginx-sample-project
+    restart: always
+    build:
+      context: .
+      dockerfile: ./docker/nginx/Dockerfile
+    volumes:
+      - ./:/var/www
+      - ./docker/nginx/conf.d/:/etc/nginx/conf.d
+    depends_on:
+      - php-fpm
+    ports:
+      - "80:80"
+
+
+###> doctrine/doctrine-bundle ###
+  database:
+    image: postgres:${POSTGRES_VERSION:-15}-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-app}
+      # You should definitely change the password in production
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-!ChangeMe!}
+      POSTGRES_USER: ${POSTGRES_USER:-app}
+    volumes:
+      - database_data:/var/lib/postgresql/data:rw
+      # You may use a bind-mounted host directory instead, so that it is harder to accidentally remove the volume and lose all your data!
+      # - ./docker/db/data:/var/lib/postgresql/data:rw
+###< doctrine/doctrine-bundle ###
+
+volumes:
+###> doctrine/doctrine-bundle ###
+  database_data:
+###< doctrine/doctrine-bundle ###
